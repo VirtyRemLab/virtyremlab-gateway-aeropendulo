@@ -11,5 +11,15 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --workers 1 --loop uvloop
 ```
 
 # Despliegue
-Para el despliegue se empleará un contenedor de docker. 
+Para el despliegue se empleará un contenedor de docker. La imagen se crear a partir del ```Dockerfile```.
 
+Creación de la imagen:
+
+```bash
+docker build -t gateway-esp-aeropendulo:v0.1 .
+```
+
+Ejecutar el contenedor para la imagen creada:
+```bash 
+docker run -d -p 8001:8000 -p 8765:8765 gateway-esp-aeropendulo:v0.1
+```

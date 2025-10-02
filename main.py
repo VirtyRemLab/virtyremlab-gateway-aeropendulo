@@ -14,7 +14,7 @@ import struct
 import json
 import time
 from pydantic import BaseModel
-
+from websockets.exceptions import ConnectionClosed, ConcurrencyError 
 
 
 PORT = 8765
@@ -24,10 +24,11 @@ app = FastAPI()
 
 
 # Request body
-class Item(BaseModel):
-    Tm: float
+class DeviceStatus(BaseModel):
+    device_id: str
+    connected: bool
 
-
+STATUS = DeviceStatus(device_id="esp-aeropendulo",connected = False)
 # Método post para cambiar el periodo de muestreo 
 # Ejemplo: http://156.35.152.161:8001/Tm?Tm=200.0
 @app.get("/Tm")
@@ -36,6 +37,23 @@ async def create_item(Tm: float):
     conn = [conn for conn in esp32_websockets]
     await conn[0].send(json.dumps(freq_event))
     return f"Tm enviado: {Tm}"
+
+
+
+@app.get("/status", response_model=DeviceStatus)
+async def device_status():
+    return STATUS
+
+
+    # pong_waiter = await conn[0].ping()
+    # try:
+    #     latency = await pong_waiter
+    #     return DeviceStatus(device_id="esp-aeropendulo",
+    #                         connected=True)
+    # except ConnectionClosed or ConcurrencyError:
+    #     return DeviceStatus(device_id="esp-aeropendulo",
+    #                         connected=False)
+
 
 
 
@@ -50,6 +68,7 @@ esp32_websockets = set()
 # Handler de mensajes WebSocket
 async def ws_esp32_handler(websocket):
     print("ESP32 conectado")
+    STATUS.connected = True
     esp32_websockets.add(websocket)
     try:
         async for message in websocket:
@@ -59,11 +78,12 @@ async def ws_esp32_handler(websocket):
                
     except websockets.exceptions.ConnectionClosedError:
         print("ESP32 desconectado")
+        STATUS.connected = False
     finally:
         esp32_websockets.remove(websocket)
 
 
-
+a = websockets.serve(ws_esp32_handler, "0.0.0.0", PORT)
 # Callback para la creación inicial del servidor WS
 async def serve_ws():
     async with websockets.serve(ws_esp32_handler, "0.0.0.0", PORT) as server:

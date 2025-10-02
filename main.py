@@ -8,13 +8,11 @@
 
 import asyncio
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
 import websockets
 import struct
 import json
-import time
 from pydantic import BaseModel
-from websockets.exceptions import ConnectionClosed, ConcurrencyError 
+
 
 
 PORT = 8765

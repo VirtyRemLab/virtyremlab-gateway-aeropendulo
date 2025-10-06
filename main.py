@@ -21,13 +21,28 @@ import nats
 PORT = 8765
 NATS_SERVERS = []
 
+# Guardar el estado del ESP32 (si necesitas enviarle datos)
+esp32_websockets = set()
 
 # Callback para la creación inicial del servidor WS
 async def serve_ws():
-    async with websockets.serve(ws_esp32_handler, "0.0.0.0", PORT) as server:
-        print("Servidor WebSocket corriendo en puerto 8765")
-        await server.serve_forever()  # Nunca termina
+    server = await websockets.serve(ws_esp32_handler, "0.0.0.0", PORT) 
+    print("Servidor WebSocket corriendo en puerto 8765")
+    await server.serve_forever()  # Nunca termina
+    esp32_websockets.add(server)
+
+async def cb_freq(msg):
+    subject = msg.subject
+    reply = msg.reply
+    data =  struct.unpack("f",msg.data)[0]
+    print("Received a message on '{subject} {reply}': {data}".format(
+        subject=subject, reply=reply, data=data))
     
+    val = data if not isinstance(data,(int,float)) else str(data)
+    
+    freq_event = {"freq":val}
+    conn = [conn for conn in esp32_websockets]
+    await conn[0].send(json.dumps(freq_event))    
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,9 +50,12 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(serve_ws())
     # Nos conectamos al broker NATS
     NATS_SERVERS.append(await nats.connect("nats://demo.nats.io:4222"))
+
+    sub = await NATS_SERVERS[0].subscribe("aeropendulo.esp32.freq", cb=cb_freq)
     yield 
     # Cuando acaba la aplicación el yield reanuda la ejecución aquí
     # Se desconecta del NATS
+    await sub.unsubscribe()
     await NATS_SERVERS[0].drain()
 
 
@@ -85,8 +103,6 @@ async def device_status():
 ## Gestión de la conexión con el ESP32
 #####################################################################################
 
-# Guardar el estado del ESP32 (si necesitas enviarle datos)
-esp32_websockets = set()
 
 # Handler de mensajes WebSocket
 async def ws_esp32_handler(websocket):

@@ -8,17 +8,42 @@
 
 import asyncio
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 import websockets
 import struct
 import json
 from pydantic import BaseModel
+import time
+import nats 
 
 
 
 PORT = 8765
+NATS_SERVERS = []
+
+
+# Callback para la creación inicial del servidor WS
+async def serve_ws():
+    async with websockets.serve(ws_esp32_handler, "0.0.0.0", PORT) as server:
+        print("Servidor WebSocket corriendo en puerto 8765")
+        await server.serve_forever()  # Nunca termina
+    
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Servidor ws para la conexión con el ESP32
+    asyncio.create_task(serve_ws())
+    # Nos conectamos al broker NATS
+    NATS_SERVERS.append(await nats.connect("nats://demo.nats.io:4222"))
+    yield 
+    # Cuando acaba la aplicación el yield reanuda la ejecución aquí
+    # Se desconecta del NATS
+    await NATS_SERVERS[0].drain()
+
 
 # Crear aplicación FastAPI
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
+# app = FastAPI()
 
 
 # Request body
@@ -72,7 +97,10 @@ async def ws_esp32_handler(websocket):
         async for message in websocket:
             if isinstance(message,bytes):
                 dataBloc = struct.unpack("<ff",message)
-                #print(f"[ESP32] → {time.time()}:{dataBloc}")
+                print(f"[ESP32] → {time.time()}:{dataBloc}")
+                # TODO. deshacer el stream de bytes en variables del proceso y enviarlas una a una.
+                #      Sería más eficiente retransmitir el stream al completo, pero menos interpretable y estructurado.
+                await NATS_SERVERS[0].publish("aeropendulo.esp32.y", message)
                
     except websockets.exceptions.ConnectionClosedError:
         print("ESP32 desconectado")
@@ -81,16 +109,12 @@ async def ws_esp32_handler(websocket):
         esp32_websockets.remove(websocket)
 
 
-a = websockets.serve(ws_esp32_handler, "0.0.0.0", PORT)
-# Callback para la creación inicial del servidor WS
-async def serve_ws():
-    async with websockets.serve(ws_esp32_handler, "0.0.0.0", PORT) as server:
-        print("Servidor WebSocket corriendo en puerto 8765")
-        await server.serve_forever()  # Nunca termina
 
-# Iniciar WebSocket Server como tarea background
-@app.on_event("startup")
-async def start_ws_server():
-    asyncio.create_task(serve_ws())
+
+
+# # Iniciar WebSocket Server como tarea background
+# @app.on_event("startup")
+# async def start_ws_server():
+  
 
 

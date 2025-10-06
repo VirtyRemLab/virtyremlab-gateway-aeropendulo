@@ -23,3 +23,18 @@ Ejecutar el contenedor para la imagen creada:
 ```bash 
 docker run -d -p 8001:8000 -p 8765:8765 --name gateway-esp-aeropendulo gateway-esp-aeropendulo:v0.1
 ```
+
+# NATS
+Los mensajes recibidos por websockets del ESP se reenviarán a un servidor NATS. Este servidor es otro contenedor de docker que se ejecutará como:
+```bash
+docker pull nats:latest
+docker run -p 4222:4222 -ti nats:latest
+```
+
+# Modelos de los datos [en pruebas] 
+
+El gateway recibe un array de dos valores binarios. El primero de ellos simula el seno y el segundo siempre es 0. Se definen los siguientes tópicos para el servidor NATS:
+
+- aeropendulo.esp32.y
+- aeropendulo.esp32.nulo
+

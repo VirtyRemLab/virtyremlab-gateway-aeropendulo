@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
     # Servidor ws para la conexión con el ESP32
     asyncio.create_task(serve_ws())
     # Nos conectamos al broker NATS
-    NATS_SERVERS.append(await nats.connect("nats://demo.nats.io:4222"))
+    NATS_SERVERS.append(await nats.connect("nats://localhost:4222"))
 
     sub = await NATS_SERVERS[0].subscribe("aeropendulo.esp32.freq", cb=cb_freq)
     yield 
@@ -112,7 +112,7 @@ async def ws_esp32_handler(websocket):
     try:
         async for message in websocket:
             if isinstance(message,bytes):
-                dataBloc = struct.unpack("<ff",message)
+                dataBloc = struct.unpack("<ffffff",message)
                 print(f"[ESP32] → {time.time()}:{dataBloc}")
                 # TODO. deshacer el stream de bytes en variables del proceso y enviarlas una a una.
                 #      Sería más eficiente retransmitir el stream al completo, pero menos interpretable y estructurado.

@@ -19,7 +19,33 @@ import nats
 
 
 PORT = 8765
+MSG_LENGH_FLOATS = 10
 NATS_SERVERS = []
+
+
+#TODO: Sacar la configuración de la comunicación a un archivo externo que lo compartan
+# todas las imágenes de docker
+AEROPENDULO_COMS_CONFIG = {
+    "lenght":11,
+    "model":{ "mode": "estado del sistema [STANDBY, READY,TEST, PID, ALARM]",
+             "yk": "salida del sistema",
+             "rk": "Referencia",
+             "uk": "Acción de control",
+             "ek": "Error del sistema",
+             "M1": "Vel del motor 1",
+             "M2": "Vel del motor 2",
+             "vel_man": "Consigna para la velocidad manual",
+             "Kp": "Consigna para la ganancia proporcional del regulador PID",
+             "Ki": "Consigna para la ganancia integral del regulador PID",
+             "Kd": "Consigna para la ganancia diferencial del regulador PID"
+    },
+    "interface":{"event": "mandar eventos al ESP enum EVENTS {NONE:0,POWERON:1,POWEROFF:2,START_PID:3,START_TEST:4,STOP:4,RESET:5,FAULT:6"},
+                 "vel_man": "Cambiar la vel manual",
+                 "Kp":"Cambiar la Kp del sistema",
+                 "Ki":"Cambiar la Ki del sistema",
+                 "Kd":"Cambiar la Kd del sistema"
+
+}
 
 # Guardar el estado del ESP32 (si necesitas enviarle datos)
 esp32_websockets = set()
@@ -44,18 +70,55 @@ async def cb_freq(msg):
     conn = [conn for conn in esp32_websockets]
     await conn[0].send(json.dumps(freq_event))    
 
+async def cb_generic(msg):
+
+    subject = msg.subject
+    command = subject.split(".")[-1]
+    reply = msg.reply
+    data =  struct.unpack("f",msg.data)[0]
+    print(f"{subject}")
+    print("Received a message on '{command}': {data}".format(
+        command=command, data=data))
+    
+    val = data if not isinstance(data,(int,float)) else str(data)
+    
+    event = {command:val}
+    conn = [conn for conn in esp32_websockets]
+    await conn[0].send(json.dumps(event))    
+
+# async def cb_generic2(msg):
+
+#     subject = msg.subject
+#     command = subject.split(".")[-1]
+#     reply = msg.reply
+#     data =  struct.unpack("f",msg.data)[0]
+#     print(f"{subject}")
+#     print("Received a message on '{command}': {data}".format(
+#         command=command, data=data))
+    
+#     val = data if not isinstance(data,(int,float)) else str(data)
+    
+#     event = {command:val}
+#     conn = [conn for conn in esp32_websockets]
+#     await conn[0].send(json.dumps(event))    
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Servidor ws para la conexión con el ESP32
     asyncio.create_task(serve_ws())
     # Nos conectamos al broker NATS
     NATS_SERVERS.append(await nats.connect("nats://localhost:4222"))
+    subs = []
 
-    sub = await NATS_SERVERS[0].subscribe("aeropendulo.esp32.freq", cb=cb_freq)
+    for k,v in AEROPENDULO_COMS_CONFIG["interface"].items():
+        subs.append(await NATS_SERVERS[0].subscribe(f"aeropendulo.esp32.{k}", cb=cb_generic))
+    
     yield 
     # Cuando acaba la aplicación el yield reanuda la ejecución aquí
     # Se desconecta del NATS
-    await sub.unsubscribe()
+    for sub in subs:
+        await sub.unsubscribe()
     await NATS_SERVERS[0].drain()
 
 
@@ -86,22 +149,12 @@ async def device_status():
     return STATUS
 
 
-    # pong_waiter = await conn[0].ping()
-    # try:
-    #     latency = await pong_waiter
-    #     return DeviceStatus(device_id="esp-aeropendulo",
-    #                         connected=True)
-    # except ConnectionClosed or ConcurrencyError:
-    #     return DeviceStatus(device_id="esp-aeropendulo",
-    #                         connected=False)
-
-
-
 
 
 #####################################################################################
 ## Gestión de la conexión con el ESP32
 #####################################################################################
+
 
 
 # Handler de mensajes WebSocket
@@ -112,11 +165,12 @@ async def ws_esp32_handler(websocket):
     try:
         async for message in websocket:
             if isinstance(message,bytes):
-                dataBloc = struct.unpack("<ffffff",message)
+                dataBloc = struct.unpack("<"+"f"*AEROPENDULO_COMS_CONFIG["lenght"],message)
                 print(f"[ESP32] → {time.time()}:{dataBloc}")
-                # TODO. deshacer el stream de bytes en variables del proceso y enviarlas una a una.
-                #      Sería más eficiente retransmitir el stream al completo, pero menos interpretable y estructurado.
-                await NATS_SERVERS[0].publish("aeropendulo.esp32.y", message)
+                await NATS_SERVERS[0].publish(f"aeropendulo.esp32.state", message)
+                # for i,(k,v) in enumerate(AEROPENDULO_COMS_CONFIG["model"].items()):
+                #     await NATS_SERVERS[0].publish(f"aeropendulo.esp32.{k}", struct.pack("f",dataBloc[i]))
+                    #print(f"{i}:{k}:{v}{dataBloc[i]}")
                
     except websockets.exceptions.ConnectionClosedError:
         print("ESP32 desconectado")

@@ -22,7 +22,7 @@ PORT = 8765
 MSG_LENGH_FLOATS = 10
 NATS_SERVERS = []
 
-
+## MODELO DE LOS DATOS
 #TODO: Sacar la configuración de la comunicación a un archivo externo que lo compartan
 # todas las imágenes de docker
 AEROPENDULO_COMS_CONFIG = {
@@ -39,11 +39,11 @@ AEROPENDULO_COMS_CONFIG = {
              "Ki": "Consigna para la ganancia integral del regulador PID",
              "Kd": "Consigna para la ganancia diferencial del regulador PID"
     },
-    "interface":{"event": "mandar eventos al ESP enum EVENTS {NONE:0,POWERON:1,POWEROFF:2,START_PID:3,START_TEST:4,STOP:4,RESET:5,FAULT:6"},
+    "interface":{"event": "mandar eventos al ESP enum EVENTS {NONE:0,POWERON:1,POWEROFF:2,START_PID:3,START_TEST:4,STOP:4,RESET:5,FAULT:6",
                  "vel_man": "Cambiar la vel manual",
                  "Kp":"Cambiar la Kp del sistema",
                  "Ki":"Cambiar la Ki del sistema",
-                 "Kd":"Cambiar la Kd del sistema"
+                 "Kd":"Cambiar la Kd del sistema"}
 
 }
 

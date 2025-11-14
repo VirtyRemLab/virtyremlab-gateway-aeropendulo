@@ -21,7 +21,7 @@ docker build -t gateway-esp-aeropendulo:v0.1 .
 
 Ejecutar el contenedor para la imagen creada:
 ```bash 
-docker run -d -p 8001:8000 -p 8765:8765 --name gateway-esp-aeropendulo gateway-esp-aeropendulo:v0.1
+docker run -d -p 8001:8000 -p 8765:8765 --network virtyremlab-net --name gateway-esp-aeropendulo gateway-esp-aeropendulo:v0.1
 ```
 
 # NATS

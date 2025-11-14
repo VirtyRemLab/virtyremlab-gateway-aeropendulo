@@ -15,13 +15,13 @@ import json
 from pydantic import BaseModel
 import time
 import nats 
-
+import os
 
 
 PORT = 8765
 MSG_LENGH_FLOATS = 10
 NATS_SERVERS = []
-
+NATS_URL = os.getenv("NATS_URL","nats://localhost:4222")
 ## MODELO DE LOS DATOS
 #TODO: Sacar la configuración de la comunicación a un archivo externo que lo compartan
 # todas las imágenes de docker
@@ -108,7 +108,7 @@ async def lifespan(app: FastAPI):
     # Servidor ws para la conexión con el ESP32
     asyncio.create_task(serve_ws())
     # Nos conectamos al broker NATS
-    NATS_SERVERS.append(await nats.connect("nats://localhost:4222"))
+    NATS_SERVERS.append(await nats.connect(NATS_URL))
     subs = []
 
     for k,v in AEROPENDULO_COMS_CONFIG["interface"].items():
